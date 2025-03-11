@@ -1,0 +1,77 @@
+<?php
+require 'db.php'; // Database connection
+
+header("Content-Type: application/json; charset=UTF-8");
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: POST, GET, OPTIONS, DELETE, PUT');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    // Check if all required fields are provided
+    if (
+        empty($_POST['companyid']) ||
+        empty($_POST['employee_id']) ||
+        empty($_POST['employee_name']) ||
+        empty($_POST['employee_address']) ||
+        empty($_POST['place']) ||
+        empty($_POST['mail_id']) ||
+        empty($_POST['pincode']) ||
+        empty($_POST['mobile_number']) ||
+        empty($_POST['joined_date']) ||
+        empty($_POST['designation']) // Ensure designation is provided
+    ) {
+        echo json_encode(["error" => "All fields are required"]);
+        exit;
+    }
+
+    // Get max id + 1
+    $idQuery = "SELECT COALESCE(MAX(id), 0) + 1 AS new_id FROM employee";
+    $idResult = $conn->query($idQuery);
+    $row = $idResult->fetch_assoc();
+    $new_id = $row['new_id'];
+
+    // Sanitize input
+    $companyid = trim($_POST['companyid']);
+    $employee_id = trim($_POST['employee_id']);
+    $employee_name = trim($_POST['employee_name']);
+    $employee_address = trim($_POST['employee_address']);
+    $place = trim($_POST['place']);
+    $mail_id = trim($_POST['mail_id']);
+    $pincode = trim($_POST['pincode']);
+    $mobile_number = trim($_POST['mobile_number']);
+    $joined_date = trim($_POST['joined_date']);
+    $designation = trim($_POST['designation']);
+
+    // Handle file upload if provided
+    $thumbnail_image = null;
+    if (isset($_FILES['thumbnail_image']) && $_FILES['thumbnail_image']['error'] === UPLOAD_ERR_OK) {
+        $upload_dir = "uploads/";
+        $filename = uniqid() . "_" . basename($_FILES["thumbnail_image"]["name"]);
+        $target_file = $upload_dir . $filename;
+
+        if (move_uploaded_file($_FILES["thumbnail_image"]["tmp_name"], $target_file)) {
+            $thumbnail_image = $filename;
+        } else {
+            echo json_encode(["error" => "Failed to upload file"]);
+            exit;
+        }
+    }
+
+    // Insert data with designation and joined_date
+    $sql = "INSERT INTO employee (id, companyid, employee_id, employee_name, employee_address, place, mail_id, pincode, mobile_number, joined_date, designation, thumbnail_image) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param("iissssssssss", $new_id, $companyid, $employee_id, $employee_name, $employee_address, $place, $mail_id, $pincode, $mobile_number, $joined_date, $designation, $thumbnail_image);
+
+    if ($stmt->execute()) {
+        echo json_encode(["success" => "Employee added successfully", "id" => $new_id]);
+    } else {
+        echo json_encode(["error" => "Failed to insert employee"]);
+    }
+
+    // Close statement and connection
+    $stmt->close();
+    $conn->close();
+} else {
+    echo json_encode(["error" => "Invalid request method"]);
+}
+?>
